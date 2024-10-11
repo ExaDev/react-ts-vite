@@ -118,7 +118,10 @@ jobs:
           path: dist
 
       - name: Move artifact to pr folder
-        run: mv dist ref/${{ github.ref_name }}
+        run: |
+          mkdir -p ref
+          mv dist ref/${{ github.ref_name }}
+          ls -alRh
 
       - name: Configure Git
         run: |
