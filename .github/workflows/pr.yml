@@ -1,6 +1,7 @@
-name: Deploy to GitHub Pages
+name: Deploy to Environment GitHub Pages
 
 on:
+  push:
   pull_request:
     types:
       - opened
