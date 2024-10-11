@@ -71,7 +71,12 @@ jobs:
         run: yarn lint
         continue-on-error: true
 
+      - name: Build project using root as base path
+        if: github.ref_name == 'main'
+        run: yarn build --base ${{ needs.configure.outputs.base_path }}
+
       - name: Build project using ref as base path
+        if: github.ref_name != 'main'
         run: yarn build --base ${{ needs.configure.outputs.base_path }}/ref/${{ github.ref_name }}
 
       - name: Upload artifact
@@ -94,8 +99,8 @@ jobs:
       contents: write
     # Deploy to the github-pages environment
     environment:
-      name: ${{ github.ref_name }}
-      url: ${{ needs.configure.outputs.base_url }}/ref/${{ github.ref_name }}
+      name: ${{ github.ref_name == 'main' && 'production' || 'ref/' }}${{ github.ref_name }}
+      url: ${{ github.ref_name == 'main' && needs.configure.outputs.base_url || format('{0}/ref/{1}', needs.configure.outputs.base_url, github.ref_name) }}
 
     runs-on: ubuntu-latest
     steps:
@@ -117,18 +122,32 @@ jobs:
           name: dist
           path: dist
 
-      - name: Move artifact to pr folder
+      - name: Move artifact to root folder
+        if: github.ref_name == 'main'
+        run: |
+          mv dist/* .
+
+
+      - name: Move artifact to ref folder
+        if: github.ref_name != 'main'
         run: |
           mkdir -p ref
           mv dist ref/${{ github.ref_name }}
-          ls -alRh
+
+      - run: ls -alRh
 
       - name: Configure Git
         run: |
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
 
-      - name: Stage changes
+      - name: Stage changes for main branch
+        if: github.ref_name == 'main'
+        run: |
+          git add .
+
+      - name: Stage changes for other branches
+        if: github.ref_name != 'main'
         run: |
           git add ref/${{ github.ref_name }}
 
