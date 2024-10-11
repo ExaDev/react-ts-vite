@@ -128,4 +128,4 @@ jobs:
           git commit -m "Deploy PR #${{ github.event.number }}"
       - name: Push changes
         run: |
-          git push
+          git push --set-upstream origin gh-pages
