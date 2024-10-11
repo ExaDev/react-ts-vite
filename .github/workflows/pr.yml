@@ -71,8 +71,8 @@ jobs:
         run: yarn lint
         continue-on-error: true
 
-      - name: Build project
-        run: yarn build --base ${{ needs.configure.outputs.base_path }}/pr/${{ github.event.number }}
+      - name: Build project using ref as base path
+        run: yarn build --base ${{ needs.configure.outputs.base_path }}/${{ github.ref_name }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -95,7 +95,7 @@ jobs:
     # Deploy to the github-pages environment
     environment:
       name: pr/${{ github.event.number }}
-      url: ${{ needs.configure.outputs.base_url }}/pr/${{ github.event.number }}
+      url: ${{ needs.configure.outputs.base_url }}/${{ github.ref_name }}
 
     runs-on: ubuntu-latest
     steps:
@@ -114,7 +114,7 @@ jobs:
           path: dist
 
       - name: Move artifact to pr folder
-        run: mv dist pr/${{ github.event.number }}
+        run: mv dist ${{ github.ref_name }}
 
       - name: Configure Git
         run: |
@@ -122,10 +122,10 @@ jobs:
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
       - name: Stage changes
         run: |
-          git add pr/${{ github.event.number }}
+          git add ${{ github.ref_name }}
       - name: Commit changes
         run: |
-          git commit -m "Deploy PR #${{ github.event.number }}"
+          git commit -m "Deploy ${{ github.ref_name }} to GitHub Pages"
       - name: Push changes
         run: |
           git push --set-upstream origin gh-pages
