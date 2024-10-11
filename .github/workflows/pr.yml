@@ -72,7 +72,7 @@ jobs:
         continue-on-error: true
 
       - name: Build project using ref as base path
-        run: yarn build --base ${{ needs.configure.outputs.base_path }}/${{ github.ref_name }}
+        run: yarn build --base ${{ needs.configure.outputs.base_path }}/ref/${{ github.ref_name }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -94,18 +94,20 @@ jobs:
       contents: write
     # Deploy to the github-pages environment
     environment:
-      name: pr/${{ github.event.number }}
-      url: ${{ needs.configure.outputs.base_url }}/${{ github.ref_name }}
+      name: ref/${{ github.ref_name }}
+      url: ${{ needs.configure.outputs.base_url }}/ref/${{ github.ref_name }}
 
     runs-on: ubuntu-latest
     steps:
       - name: Checkout pages branch
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
 
-      - name: Pull or create detached pages branch
+      - name: Prepare pages branch
         run: |
           git fetch origin
-          git checkout -b gh-pages origin/gh-pages || git checkout --orphan gh-pages
+          git checkout gh-pages || git checkout --orphan gh-pages
           git reset --hard
           git status
 
@@ -116,7 +118,7 @@ jobs:
           path: dist
 
       - name: Move artifact to pr folder
-        run: mv dist ${{ github.ref_name }}
+        run: mv dist ref/${{ github.ref_name }}
 
       - name: Configure Git
         run: |
