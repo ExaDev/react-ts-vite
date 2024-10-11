@@ -93,7 +93,7 @@ jobs:
       contents: write
     # Deploy to the github-pages environment
     environment:
-      name: github-pages
+      name: pr/${{ github.event.number }}
       url: ${{ needs.configure.outputs.base_url }}/pr/${{ github.event.number }}
 
     runs-on: ubuntu-latest
