@@ -1,0 +1,160 @@
+name: Deploy to Environment GitHub Pages
+
+on:
+  push:
+  pull_request:
+    types:
+      - opened
+      - reopened
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    permissions:
+      pages: read
+    steps:
+      - name: Check secrets
+        id: check_secrets
+        run: |
+          echo "GH_APP_ID_EXISTS=${{ secrets.GH_APP_ID && 'true' || 'false' }}" >> $GITHUB_OUTPUT
+          echo "GH_APP_PRIVATE_KEY_EXISTS=${{ secrets.GH_APP_PRIVATE_KEY && 'true' || 'false' }}" >> $GITHUB_OUTPUT
+          echo "GH_APP_EXISTS=${{ secrets.GH_APP_ID && secrets.GH_APP_PRIVATE_KEY && 'true' || 'false' }}" >> $GITHUB_OUTPUT
+
+      - name: Generate a token
+        if: steps.check_secrets.outputs.GH_APP_EXISTS == 'true'
+        continue-on-error: true
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ github.event.repository.name }}
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+        with:
+          # enablement: true # requires administration:write and pages:write
+          enablement: ${{ steps.generate_token.outputs.token && 'true' || 'false' }}
+          token: ${{ steps.generate_token.outputs.token || github.token }}
+    outputs:
+      base_url: ${{ steps.pages.outputs.base_url }}
+      origin: ${{ steps.pages.outputs.origin }}
+      host: ${{ steps.pages.outputs.host }}
+      base_path: ${{ steps.pages.outputs.base_path }}
+
+  build:
+    runs-on: ubuntu-latest
+    needs:
+      - configure
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Typecheck
+        run: yarn tsc -b
+        continue-on-error: true
+
+      - name: Lint
+        run: yarn lint
+        continue-on-error: true
+
+      - name: Build project using root as base path
+        if: github.ref_name == 'main'
+        run: yarn build --base ${{ needs.configure.outputs.base_path }}
+
+      - name: Build project using ref as base path
+        if: github.ref_name != 'main'
+        run: yarn build --base ${{ needs.configure.outputs.base_path }}/ref/${{ github.ref_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  # Deploy job
+  deploy:
+    # Add a dependency to the build job
+    needs:
+      - configure
+      - build
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment originates from an appropriate source
+      contents: write
+    # Deploy to the github-pages environment
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'ref/' }}${{ github.ref_name }}
+      url: ${{ github.ref_name == 'main' && needs.configure.outputs.base_url || format('{0}/ref/{1}', needs.configure.outputs.base_url, github.ref_name) }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pages branch
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+
+      - name: Prepare pages branch
+        run: |
+          git fetch origin
+          git checkout gh-pages || git checkout --orphan gh-pages
+          git reset --hard
+          git status
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Move artifact to root folder
+        if: github.ref_name == 'main'
+        run: |
+          mv dist/* .
+
+      - name: Move artifact to ref folder
+        if: github.ref_name != 'main'
+        run: |
+          mkdir -p ref
+          rm -r ref/${{ github.ref_name }} || echo "No previous deployment found"
+          mv dist/* ref/${{ github.ref_name }}
+
+      - run: ls -alRh
+
+      - name: Configure Git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+
+      - name: Stage changes for main branch
+        if: github.ref_name == 'main'
+        run: |
+          git add .
+
+      - name: Stage changes for other branches
+        if: github.ref_name != 'main'
+        run: |
+          git add ref/${{ github.ref_name }}
+
+      - name: Commit changes
+        run: |
+          git commit -m "Deploy ${{ github.ref_name }} to GitHub Pages"
+
+      - name: Push changes
+        run: |
+          git push --set-upstream origin gh-pages
