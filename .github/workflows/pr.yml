@@ -101,8 +101,11 @@ jobs:
     steps:
       - name: Checkout pages branch
         uses: actions/checkout@v4
-        with:
-          ref: gh-pages
+
+      - name: Pull or create detached pages branch
+        run: |
+          git fetch origin
+          git checkout -b gh-pages origin/gh-pages || git checkout --orphan gh-pages
 
       - name: Download artifact
         uses: actions/download-artifact@v4
