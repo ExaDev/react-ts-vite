@@ -131,6 +131,7 @@ jobs:
         if: github.ref_name != 'main'
         run: |
           mkdir -p ref
+          rm -r ref/${{ github.ref_name }} || echo "No previous deployment found"
           mv dist/* ref/${{ github.ref_name }}
 
       - run: ls -alRh
