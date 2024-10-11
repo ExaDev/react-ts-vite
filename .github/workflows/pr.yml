@@ -94,7 +94,7 @@ jobs:
       contents: write
     # Deploy to the github-pages environment
     environment:
-      name: ref/${{ github.ref_name }}
+      name: ${{ github.ref_name }}
       url: ${{ needs.configure.outputs.base_url }}/ref/${{ github.ref_name }}
 
     runs-on: ubuntu-latest
