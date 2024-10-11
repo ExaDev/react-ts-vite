@@ -106,6 +106,8 @@ jobs:
         run: |
           git fetch origin
           git checkout -b gh-pages origin/gh-pages || git checkout --orphan gh-pages
+          git reset --hard
+          git status
 
       - name: Download artifact
         uses: actions/download-artifact@v4
