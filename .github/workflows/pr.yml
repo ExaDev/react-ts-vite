@@ -127,12 +127,11 @@ jobs:
         run: |
           mv dist/* .
 
-
       - name: Move artifact to ref folder
         if: github.ref_name != 'main'
         run: |
           mkdir -p ref
-          mv dist ref/${{ github.ref_name }}
+          mv dist/* ref/${{ github.ref_name }}
 
       - run: ls -alRh
 
